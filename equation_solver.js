@@ -194,13 +194,9 @@ class Equation {
             // [[1, "a"], [2, "b"], [3, "c"]]
             return a.map((k, i) => [k, b[i]]);
         }
-
         if (Equation.get_depth(a) === 0 && Equation.get_depth(b) === 0) {
-            if (a == b) {
-                return true;
-            }
+            return a == b;
         } else if (Equation.get_depth(a) === Equation.get_depth(b)) {
-
             let condition1 = false;
             let condition2 = false;
 
@@ -209,8 +205,44 @@ class Equation {
             }
             let temp = zip(a.children, b.children);
 
-
             condition2 = temp.every(childs => Equation.is_equal(childs[0], childs[1]));
+            return condition1 && condition2;
+
+        } else {
+            return false;
+        }
+    }
+    static of_the_same_form(a, b) {
+        // Assume that a and b are simplified
+        // If a and b are exactly the same except for the value of numbers, return true
+
+        function zip(a, b) {
+            // zip([1,2,3], ["a","b","c"])
+            // [[1, "a"], [2, "b"], [3, "c"]]
+            return a.map((k, i) => [k, b[i]]);
+        }
+
+        function isNumber(n) {
+            return !isNaN(n);
+        }
+        if (Equation.get_depth(a) === 0 && Equation.get_depth(b) === 0) {
+            if (a == "x" && b == "x") {
+                return true;
+            } else if (isNumber(a) && isNumber(b)) {
+                return true;
+            } else {
+                return false;
+            }
+        } else if (Equation.get_depth(a) === Equation.get_depth(b)) {
+            let condition1 = false;
+            let condition2 = false;
+
+            if (a.operation == b.operation) {
+                condition1 = true;
+            }
+            let temp = zip(a.children, b.children);
+
+            condition2 = temp.every(childs => Equation.of_the_same_form(childs[0], childs[1]));
             return condition1 && condition2;
 
         } else {
@@ -281,68 +313,17 @@ class Equation {
 }
 
 class Solver {
-    static one_step_BFS(e) {
+    constructor(expression_str) {
+        this.equation = new Equation(expression_str);
+    }
+    one_step_BFS() {
         // One step Breath First Search over all levels.
         // TODO
         return [Equation];
     }
-    static is_immediately_solvable(e) {
-        // Check if the equation is solved or not
-        if (Equation.get_depth(e) === 1) {
-            return true;
-        }
-        return false;
-    }
-    static solve(equation) {
-        // Solve the equation and return the solution
-        // The equation is in the form of Equation class
+    static match_solvable_cases(e) {
 
-        if (equation.operation == '=') {
-            let left = equation.children[0];
-            let right = equation.children[1];
-            if (Equation.is_simplified(left) && Equation.is_simplified(right)) {
-                if (Equation.is_equal(left, right)) {
-                    return "All real numbers are solutions";
-                } else {
-                    return "No solution";
-                }
-            } else {
-                // Solve the equation recursively
-                let left_solution = Solver.solve(left);
-                let right_solution = Solver.solve(right);
-                return [left_solution, right_solution];
-            }
-        } else if (equation.operation == 'sqrt') {
-            let child = equation.children[0];
-            if (Equation.is_simplified(child)) {
-                return Solver.solve(child);
-            } else {
-                return undefined;
-            }
-        } else if (equation.operation == '+') {
-            // Handle addition
-            let temp = equation.children.map(child => Solver.solve(child));
-            return temp.reduce((first, next) => first + next);
-        } else if (equation.operation == '-') {
-            // Handle subtraction
-            let temp = equation.children.map(child => Solver.solve(child));
-            return temp.reduce((first, next) => first - next);
-        } else if (equation.operation == '*') {
-            // Handle multiplication
-            let temp = equation.children.map(child => Solver.solve(child));
-            return temp.reduce((first, next) => first * next);
-        } else if (equation.operation == '/') {
-            // Handle division
-            let temp = equation.children.map(child => Solver.solve(child));
-            return temp.reduce((first, next) => first / next);
-        } else if (equation.operation == '^') {
-            // Handle power
-            let base = Solver.solve(equation.children[0]);
-            let exponent = Solver.solve(equation.children[1]);
-            return Math.pow(base, exponent);
-        }
     }
-
     static linear_equation(a, b) {
 
         // Solve the linear equation ax + b = 0
@@ -353,7 +334,6 @@ class Solver {
             return -b / a;
         }
     }
-
     static quadratic_equation(a, b, c) {
         // Solve the quadratic equation ax^2 + bx + c = 0
         // Return x = (-b + sqrt(b^2 - 4ac)) / (2a) or x = (-b - sqrt(b^2 - 4ac)) / (2a)
@@ -371,7 +351,6 @@ class Solver {
         }
 
     }
-
     static cubic_equation(a, b, c, d) {
         // Solve the cubic equation ax^3 + bx^2 + cx + d = 0
         if (a === 0) {
@@ -413,7 +392,6 @@ class Solver {
             return [root1, root2, root3];
         }
     }
-
     static quartic_equation(a, b, c, d, e) {
         // Solve the quartic equation ax^4 + bx^3 + cx^2 + dx + e = 0
         if (a === 0) {
@@ -456,8 +434,6 @@ class Solver {
         return roots.filter(root => !isNaN(root));
     }
 }
-
-
 
 function main() {
     var s1 = "sqrt(x^2 + x + 1 + 1) = 2";
