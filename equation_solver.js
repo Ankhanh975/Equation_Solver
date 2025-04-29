@@ -220,8 +220,6 @@ class Equation {
     static is_simplified(e) {
         // (1) if not contains numerial expressions
         // (2) match for a+a, a*a, a-a or a/a
-        // (3) sort children: a*3 becomes 3*a;
-        // TODO
         function is_simplified_1(e) {
             function contains_unsolve_variable(e) {
                 if (Equation.isBasedNode(e) && e == 'x') {
@@ -245,6 +243,7 @@ class Equation {
                 }
             }
         }
+
         function is_simplified_2(e) {
             function is_equal(array, func) {
                 // Check if any elements are equal to each others
@@ -279,18 +278,9 @@ class Equation {
         }
         return is_simplified_1(e) && is_simplified_2(e);
     }
-    static simplify(e) {
-        // If (a*a)*a or (a+a)+a, transform the structure so that it has depth 1 and length of e.children from 2 to 3.
-        // TODO
+}
 
-        if (Equation.get_depth(e) == 0) {
-            return;
-        } else if (Equation.get_depth(e) == 1) {
-            if (this.operation_list.includes(operation)) {}
-        } else {
-
-        }
-    }
+class Solver {
     static one_step_BFS(e) {
         // One step Breath First Search over all levels.
         // TODO
@@ -303,12 +293,171 @@ class Equation {
         }
         return false;
     }
+    static solve(equation) {
+        // Solve the equation and return the solution
+        // The equation is in the form of Equation class
+
+        if (equation.operation == '=') {
+            let left = equation.children[0];
+            let right = equation.children[1];
+            if (Equation.is_simplified(left) && Equation.is_simplified(right)) {
+                if (Equation.is_equal(left, right)) {
+                    return "All real numbers are solutions";
+                } else {
+                    return "No solution";
+                }
+            } else {
+                // Solve the equation recursively
+                let left_solution = Solver.solve(left);
+                let right_solution = Solver.solve(right);
+                return [left_solution, right_solution];
+            }
+        } else if (equation.operation == 'sqrt') {
+            let child = equation.children[0];
+            if (Equation.is_simplified(child)) {
+                return Solver.solve(child);
+            } else {
+                return undefined;
+            }
+        } else if (equation.operation == '+') {
+            // Handle addition
+            let temp = equation.children.map(child => Solver.solve(child));
+            return temp.reduce((first, next) => first + next);
+        } else if (equation.operation == '-') {
+            // Handle subtraction
+            let temp = equation.children.map(child => Solver.solve(child));
+            return temp.reduce((first, next) => first - next);
+        } else if (equation.operation == '*') {
+            // Handle multiplication
+            let temp = equation.children.map(child => Solver.solve(child));
+            return temp.reduce((first, next) => first * next);
+        } else if (equation.operation == '/') {
+            // Handle division
+            let temp = equation.children.map(child => Solver.solve(child));
+            return temp.reduce((first, next) => first / next);
+        } else if (equation.operation == '^') {
+            // Handle power
+            let base = Solver.solve(equation.children[0]);
+            let exponent = Solver.solve(equation.children[1]);
+            return Math.pow(base, exponent);
+        }
+    }
+
+    static linear_equation(a, b) {
+
+        // Solve the linear equation ax + b = 0
+        // Return x = -b/a
+        if (a == 0) {
+            return undefined;
+        } else {
+            return -b / a;
+        }
+    }
+
+    static quadratic_equation(a, b, c) {
+        // Solve the quadratic equation ax^2 + bx + c = 0
+        // Return x = (-b + sqrt(b^2 - 4ac)) / (2a) or x = (-b - sqrt(b^2 - 4ac)) / (2a)
+        if (a == 0) {
+            return linear_equation(b, c);
+        } else {
+            let d = b * b - 4 * a * c;
+            if (d < 0) {
+                return undefined;
+            } else if (d == 0) {
+                return -b / (2 * a);
+            } else {
+                return [(-b + Math.sqrt(d)) / (2 * a), (-b - Math.sqrt(d)) / (2 * a)];
+            }
+        }
+
+    }
+
+    static cubic_equation(a, b, c, d) {
+        // Solve the cubic equation ax^3 + bx^2 + cx + d = 0
+        if (a === 0) {
+            // If a is 0, reduce to a quadratic equation
+            return quadratic_equation(b, c, d);
+        }
+
+        // Normalize coefficients
+        b /= a;
+        c /= a;
+        d /= a;
+
+        // Substitute x = y - b/3 to eliminate the quadratic term
+        const p = c - (b * b) / 3;
+        const q = (2 * b * b * b) / 27 - (b * c) / 3 + d;
+
+        // Calculate the discriminant
+        const discriminant = (q * q) / 4 + (p * p * p) / 27;
+
+        if (discriminant > 0) {
+            // One real root and two complex roots
+            const u = Math.cbrt(-q / 2 + Math.sqrt(discriminant));
+            const v = Math.cbrt(-q / 2 - Math.sqrt(discriminant));
+            const root = u + v - b / 3;
+            return [root]; // Only the real root
+        } else if (discriminant === 0) {
+            // All roots are real, at least two are equal
+            const u = Math.cbrt(-q / 2);
+            const root1 = 2 * u - b / 3;
+            const root2 = -u - b / 3;
+            return [root1, root2]; // Two real roots (one is repeated)
+        } else {
+            // Three distinct real roots
+            const r = Math.sqrt(-(p * p * p) / 27);
+            const phi = Math.acos(-q / (2 * r));
+            const root1 = 2 * Math.cbrt(r) * Math.cos(phi / 3) - b / 3;
+            const root2 = 2 * Math.cbrt(r) * Math.cos((phi + 2 * Math.PI) / 3) - b / 3;
+            const root3 = 2 * Math.cbrt(r) * Math.cos((phi + 4 * Math.PI) / 3) - b / 3;
+            return [root1, root2, root3];
+        }
+    }
+
+    static quartic_equation(a, b, c, d, e) {
+        // Solve the quartic equation ax^4 + bx^3 + cx^2 + dx + e = 0
+        if (a === 0) {
+            // If a is 0, reduce to a cubic equation
+            return cubic_equation(b, c, d, e);
+        }
+
+        // Normalize coefficients
+        b /= a;
+        c /= a;
+        d /= a;
+        e /= a;
+
+        // Substitute x = y - b/4 to eliminate the cubic term
+        const p = c - (3 * b * b) / 8;
+        const q = d - (b * b * b) / 8 + (b * c) / 2;
+        const r = e - (3 * b * b * b * b) / 256 + (b * b * c) / 16 - (b * d) / 4;
+
+        if (q === 0) {
+            // Special case: biquadratic equation
+            const roots = quadratic_equation(1, p, r);
+            return roots.map(root => [Math.sqrt(root), -Math.sqrt(root)]).flat().filter(root => !isNaN(root));
+        }
+
+        // Solve the resolvent cubic: z^3 + (p/2)z^2 + ((p^2 - 4r)/16)z - q^2/64 = 0
+        const cubicRoots = cubic_equation(1, p / 2, (p * p - 4 * r) / 16, -q * q / 64);
+        const z = cubicRoots.find(root => root >= 0); // Choose the real, non-negative root
+
+        if (z === undefined) {
+            return undefined; // No real roots
+        }
+
+        // Solve two quadratic equations
+        const sqrtZ = Math.sqrt(z);
+        const quadratic1 = quadratic_equation(1, sqrtZ, (p / 2) + z - (q / (2 * sqrtZ)));
+        const quadratic2 = quadratic_equation(1, -sqrtZ, (p / 2) + z + (q / (2 * sqrtZ)));
+
+        // Combine all roots
+        const roots = [...quadratic1, ...quadratic2].map(root => root - b / 4);
+        return roots.filter(root => !isNaN(root));
+    }
 }
 
-function equation_solver(s) {
-    // TODO
-    return;
-}
+
 
 function main() {
     var s1 = "sqrt(x^2 + x + 1 + 1) = 2";
