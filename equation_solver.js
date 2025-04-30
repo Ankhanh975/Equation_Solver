@@ -4,139 +4,144 @@ class Equation {
         // with plus, minus, multiply, divide, power, and sqrt as nodes
         // Each node will have a value and a list of children nodes
 
+        function parseAll(expression_str) {
+            let temp = one_step_parse(expression_str);
+            let operation = temp[0];
+            let children = temp[1];
+
+            children = children.map(element => {
+                if (Equation.isBasedNode(element)) {
+                    return element;
+                } else {
+                    return new Equation(element);
+                }
+            });
+            return [operation, children];
+        }
+
+        function one_step_parse(expression_str) {
+            // Parse the expression_str one step and return the operation and children nodes
+            // with plus, minus, multiply, divide, power, and sqrt as operations
+
+            // Handle '=' first
+            function mark_parathesis_by_level(expression_str) {
+
+                // Mark the parathesis by level
+                let temp = [];
+                let stack = [];
+                let level = 0;
+                for (let i = 0; i < expression_str.length; i++) {
+                    if (expression_str[i] == '(') {
+                        level++;
+                        stack.push(i);
+                    } else if (expression_str[i] == ')') {
+                        level--;
+                        temp.push([stack.pop(), i, level]);
+                    }
+                }
+                temp = temp.map(braces_pair => {
+                    var open = braces_pair[0];
+                    const close = braces_pair[1];
+
+                    if (open >= 4 && expression_str.substring(open - 4, open + 1) == "sqrt(") {
+                        open = open - 4;
+                    }
+                    return [open, close];
+                });
+                return temp;
+            }
+
+            function string_slice_ignoring_region(s, symbol, bounds) {
+                let allFound = [];
+                for (let i = 0; i < s.length; i++) {
+                    const char = s[i];
+                    if (char == symbol) {
+                        if (bounds.some(bound => i >= bound[0] && i <= bound[1])) {
+                            continue;
+                        } else {
+                            allFound.push(i);
+
+                        }
+                    }
+                }
+                let temp = [];
+                // Slice the string at allFound coordinate
+                allFound.unshift(0);
+                allFound.push(expression_str.length);
+                for (let i = 1; i < allFound.length; i++) {
+                    if (i === 1) {
+                        temp.push(expression_str.substring(allFound[i - 1], allFound[i]));
+                    } else {
+                        temp.push(expression_str.substring(allFound[i - 1] + 1, allFound[i]));
+                    }
+                }
+                return temp;
+            }
+
+            function string_includes_ignoring_region(s, symbol, bounds) {
+                for (let i = 0; i < s.length; i++) {
+                    const char = s[i];
+                    if (char == symbol) {
+                        let is_in_region = false;
+                        for (let j = 0; j < bounds.length; j++) {
+                            const bound = bounds[j];
+                            if (i >= bound[0] && i <= bound[1]) {
+                                is_in_region = true;
+                                break;
+                            }
+                        }
+                        if (!is_in_region) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+            expression_str = expression_str.replaceAll(' ', '');
+            if (expression_str[0] == "(" && expression_str[expression_str.length - 1] == ")") {
+                expression_str = expression_str.substring(1, expression_str.length - 1);
+            }
+            let operation = undefined;
+            let bounds = mark_parathesis_by_level(expression_str);
+            let parts = [];
+
+            if (Equation.isBasedNode(expression_str)) {
+                return expression_str;
+            }
+
+            if (expression_str.includes('=')) {
+                operation = '=';
+                parts = expression_str.split('=');
+                return [operation, parts];
+            }
+
+
+            const successed = ['+', '-', '*', '/', '^'].some((match, index) => {
+                if (string_includes_ignoring_region(expression_str, match, bounds)) {
+                    operation = match;
+                    parts = string_slice_ignoring_region(expression_str, match, bounds);
+                    return true;
+                }
+            });
+            if (!successed) {
+                // Handle 'sqrt' next 
+                if (expression_str.startsWith('sqrt')) {
+                    operation = 'sqrt';
+                    parts = [expression_str.slice(5, -1)]; // Remove 'sqrt(' and ')'
+                    return [operation, parts];
+                }
+            }
+            return [operation, parts];
+        }
+
         this.children = [];
         this.operation = null; // +, -, *, /, ^, sqrt
 
         // Remove all space in expression_str
         expression_str = expression_str.replaceAll(' ', '');
-        this.parseAll(expression_str);
-    }
-    parseAll(expression_str) {
-        let temp = this.one_step_parse(expression_str);
+        var temp = parseAll(expression_str);
         this.operation = temp[0];
         this.children = temp[1];
-
-        this.children = this.children.map(element => {
-            if (Equation.isBasedNode(element)) {
-                return element;
-            } else {
-                return new Equation(element);
-            }
-        });
-    }
-    one_step_parse(expression_str) {
-        // Parse the expression_str one step and return the operation and children nodes
-        // with plus, minus, multiply, divide, power, and sqrt as operations
-
-        // Handle '=' first
-        function mark_parathesis_by_level(expression_str) {
-
-            // Mark the parathesis by level
-            let temp = [];
-            let stack = [];
-            let level = 0;
-            for (let i = 0; i < expression_str.length; i++) {
-                if (expression_str[i] == '(') {
-                    level++;
-                    stack.push(i);
-                } else if (expression_str[i] == ')') {
-                    level--;
-                    temp.push([stack.pop(), i, level]);
-                }
-            }
-            temp = temp.map(braces_pair => {
-                var open = braces_pair[0];
-                const close = braces_pair[1];
-
-                if (open >= 4 && expression_str.substring(open - 4, open + 1) == "sqrt(") {
-                    open = open - 4;
-                }
-                return [open, close];
-            });
-            return temp;
-        }
-
-        function string_slice_ignoring_region(s, symbol, bounds) {
-            let allFound = [];
-            for (let i = 0; i < s.length; i++) {
-                const char = s[i];
-                if (char == symbol) {
-                    if (bounds.some(bound => i >= bound[0] && i <= bound[1])) {
-                        continue;
-                    } else {
-                        allFound.push(i);
-
-                    }
-                }
-            }
-            let temp = [];
-            // Slice the string at allFound coordinate
-            allFound.unshift(0);
-            allFound.push(expression_str.length);
-            for (let i = 1; i < allFound.length; i++) {
-                if (i === 1) {
-                    temp.push(expression_str.substring(allFound[i - 1], allFound[i]));
-                } else {
-                    temp.push(expression_str.substring(allFound[i - 1] + 1, allFound[i]));
-                }
-            }
-            return temp;
-        }
-
-        function string_includes_ignoring_region(s, symbol, bounds) {
-            for (let i = 0; i < s.length; i++) {
-                const char = s[i];
-                if (char == symbol) {
-                    let is_in_region = false;
-                    for (let j = 0; j < bounds.length; j++) {
-                        const bound = bounds[j];
-                        if (i >= bound[0] && i <= bound[1]) {
-                            is_in_region = true;
-                            break;
-                        }
-                    }
-                    if (!is_in_region) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-        expression_str = expression_str.replaceAll(' ', '');
-        if (expression_str[0] == "(" && expression_str[expression_str.length - 1] == ")") {
-            expression_str = expression_str.substring(1, expression_str.length - 1);
-        }
-        let operation = undefined;
-        let bounds = mark_parathesis_by_level(expression_str);
-        let parts = [];
-
-        if (Equation.isBasedNode(expression_str)) {
-            return expression_str;
-        }
-
-        if (expression_str.includes('=')) {
-            operation = '=';
-            parts = expression_str.split('=');
-            return [operation, parts];
-        }
-
-
-        const successed = ['+', '-', '*', '/', '^'].some((match, index) => {
-            if (string_includes_ignoring_region(expression_str, match, bounds)) {
-                operation = match;
-                parts = string_slice_ignoring_region(expression_str, match, bounds);
-                return true;
-            }
-        });
-        if (!successed) {
-            // Handle 'sqrt' next 
-            if (expression_str.startsWith('sqrt')) {
-                operation = 'sqrt';
-                parts = [expression_str.slice(5, -1)]; // Remove 'sqrt(' and ')'
-                return [operation, parts];
-            }
-        }
-        return [operation, parts];
     }
     print() {
         let operation = this.operation;
@@ -242,7 +247,11 @@ class Equation {
             }
             let temp = zip(a.children, b.children);
 
-            condition2 = temp.every(childs => Equation.of_the_same_form(childs[0], childs[1]));
+            if (a.operation == "^") {
+                condition2 = temp.every(childs => Equation.is_equal(childs[0], childs[1]));
+            } else {
+                condition2 = temp.every(childs => Equation.of_the_same_form(childs[0], childs[1]));
+            }
             return condition1 && condition2;
 
         } else {
@@ -252,12 +261,39 @@ class Equation {
     static is_simplified(e) {
         // (1) if not contains numerial expressions
         // (2) match for a+a, a*a, a-a or a/a
+        // (3) if 1*a, 0*a, a+0, a-0, a^1, a^0, 
+        // TODO (4) if * and /, or + and -, or sqrt and ^2 can undo each others
+        function match_any_any(array, func) {
+            // Check if any elements are equal to each others
+            // check all permutations of the array
+
+            if (array.length == 0) {
+                return true;
+            } else {
+                let temp = array.some((element, index) => {
+                    let temp2 = array.some((element2, index2) => {
+                        if (index == index2) {
+                            return false;
+                        } else {
+                            return func(element, element2);
+                        }
+                    });
+                    return temp2;
+                });
+                return temp;
+            }
+        }
+
+        function isNumber(n) {
+            return !isNaN(n);
+        }
+
         function is_simplified_1(e) {
-            function contains_unsolve_variable(e) {
+            function has_unsolve_variable(e) {
                 if (Equation.isBasedNode(e) && e == 'x') {
                     return true;
                 } else if (!Equation.isBasedNode(e)) {
-                    let temp = e.children.some(child => contains_unsolve_variable(child));
+                    let temp = e.children.some(child => has_unsolve_variable(child));
                     return temp;
                 } else {
                     return false;
@@ -266,8 +302,11 @@ class Equation {
             if (Equation.get_depth(e) == 0) {
                 return true;
             } else {
+                if (has_unsolve_variable(e)) {
+                    if (match_any_any(e.children, (a, b) => isNumber(a) && isNumber(b))) {
+                        return false;
+                    }
 
-                if (contains_unsolve_variable(e)) {
                     let temp = e.children.every(child => is_simplified_1(child));
                     return temp;
                 } else {
@@ -277,52 +316,86 @@ class Equation {
         }
 
         function is_simplified_2(e) {
-            function is_equal(array, func) {
-                // Check if any elements are equal to each others
-                // check all permutations of the array
-
-                if (array.length == 0) {
-                    return true;
-                } else {
-                    let temp = array.some((element, index) => {
-                        let temp2 = array.some((element2, index2) => {
-                            if (index == index2) {
-                                return false;
-                            } else {
-                                return func(element, element2);
-                            }
-                        });
-                        return temp2;
-                    });
-                    return temp;
-                }
-            }
             if (Equation.get_depth(e) == 0) {
                 return true;
             } else {
                 if (["*", "/", "+", "-"].includes(e.operation)) {
-                    if (is_equal(e.children, Equation.is_equal)) {
+                    if (match_any_any(e.children, Equation.is_equal)) {
                         return false;
                     }
                 }
                 return !e.children.some(e => !is_simplified_2(e));
             }
         }
-        return is_simplified_1(e) && is_simplified_2(e);
+
+        function is_simplified_3(e) {
+            // (3) if 1*a, 0*a, a+0, a-0, a^1, a^0, 
+            if (Equation.get_depth(e) == 0) {
+                return true;
+            } else {
+                if (e.operation == "*") {
+                    if (e.children.some(child => Equation.is_equal(child, "0"))) {
+                        return false;
+                    } else if (e.children.some(child => Equation.is_equal(child, "1"))) {
+                        return false;
+                    }
+                } else if (e.operation == "+" || e.operation == "-") {
+                    if (e.children.some(child => Equation.is_equal(child, "0"))) {
+                        return false;
+                    }
+                } else if (e.operation == "^") {
+                    if (Equation.is_equal(e.children[1], "1")) {
+                        return false;
+                    } else if (Equation.is_equal(e.children[1], "0")) {
+                        return false;
+                    }
+                }
+                return e.children.every(e => is_simplified_3(e));
+            }
+        }
+        return is_simplified_1(e) && is_simplified_2(e) && is_simplified_3(e);
+    }
+    copy() {
+        var temp = new Equation(this.print());
+        return temp;
     }
 }
 
 class Solver {
-    constructor(expression_str) {
-        this.equation = new Equation(expression_str);
+    static test_examples = [
+        "x^2 + 2 = 6",
+        "sqrt(x) + 2 = 6",
+        "sqrt(x)^2 * x = 6",
+        "sqrt(x)^2 + x = 6",
+        "x^4 + x^3 + x^2 + x + 1 = 10",
+        "(x+1)(x+2) = 0", // TODO 
+        "(x+2)^2 = (x+1)^2", // TODO
+    ];
+    constructor(equation) {
+        this.equation = equation;
+        this.linear_form = new Equation("2 * x + 2 = 2");
+        this.quadratic_form = new Equation("2 * x ^ 2 + 2 * x + 2 = 2");
+        this.cubic_form = new Equation("2 * x ^ 3 + 2 * x ^ 2 + 2 * x + 2 = 2");
+        this.qadratic_form = new Equation("2 * x ^ 4 + 2 * x ^ 3 + 2 * x ^ 2 + 2 * x + 2 = 2");
+    }
+    matched_solvable_cases() {
+        if (Equation.of_the_same_form(this.equation, this.linear_form)) {
+            return true;
+        } else if (Equation.of_the_same_form(this.equation, this.quadratic_form)) {
+            return true;
+        } else if (Equation.of_the_same_form(this.equation, this.cubic_form)) {
+            return true;
+        } else if (Equation.of_the_same_form(this.equation, this.qadratic_form)) {
+            return true;
+        } else {
+            // TODO "(x+1)(x+2) = 0", 
+            return false;
+        }
     }
     one_step_BFS() {
         // One step Breath First Search over all levels.
         // TODO
         return [Equation];
-    }
-    static match_solvable_cases(e) {
-
     }
     static linear_equation(a, b) {
 
@@ -436,16 +509,9 @@ class Solver {
 }
 
 function main() {
-    var s1 = "sqrt(x^2 + x + 1 + 1) = 2";
-    var s2 = "sqrt(x^2 + x + 2) = 2";
-
-    var s3 = "sqrt(x^2) + 1 + sqrt(x^3) = 2";
-    // var s3 = "sqrt(x^3) + 1 + sqrt(x^3)";
-    // var s3 = "sqrt(x^2)";
-    var expression3 = new Equation(s3);
-
-    console.log(Equation.is_simplified(expression3));
-
-    // console.log(Equation.is_equal(new Equation("sqrt(x^2)"), new Equation("sqrt(x^2)")));
+    var s1 = new Equation("2 * x + 2 = 2");
+    var solver = new Solver(s1);
+    console.log(Equation.is_simplified(s1));
+    console.log(solver.matched_solvable_cases());
 }
 main();
