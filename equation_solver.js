@@ -136,6 +136,7 @@ class Equation {
 
 
         this.children = [];
+        this.parent = undefined;
         this.operation = null; // +, -, *, /, ^, sqrt
         this.need_parathesis_in_printing = undefined;
 
@@ -148,25 +149,59 @@ class Equation {
         this.operation = temp[0];
         this.children = temp[1];
     }
-    calculate_need_parathesis_in_printing() {
-        if (this.need_parathesis_in_printing == undefined) {
-            
+    calculate_need_parathesis_for_printing() {
+        if (this.need_parathesis_in_printing != undefined) {
+            return;
         }
+        // TODO
+        // Calculate the need_parathesis_in_printing for each node
+        // Construct parent pointers
+        function construct_parent_pointers(e) {
+            // Construct parent pointers for each node
+            // e.parent = null;
+            e.children.forEach(child => {
+                if (child instanceof Equation) {
+                    child.parent = e;
+                    construct_parent_pointers(child);
+                }
+            });
+        }
+        construct_parent_pointers(this);
+
+        // If the operation is + or - need parathesis in printing if the parent is *, /
+        // If the operation is + or - or / or *, need parathesis in printing if the parent is ^
+
+        function mark_parathesis(e) {
+            e.need_parathesis_in_printing = false;
+            if (e.operation == "+" || e.operation == "-") {
+                if (e.parent.operation == "*" || e.parent.operation == "/") {
+                    e.need_parathesis_in_printing = true;
+                }
+            } else if (e.operation == "+" || e.operation == "-" || e.operation == "*" || e.operation == "/") {
+                if (e.parent.operation == "^") {
+                    e.need_parathesis_in_printing = true;
+                }
+            }
+            e.children.forEach(child => {
+                if (child instanceof Equation) {
+                    mark_parathesis(child);
+                }
+            });
+        }
+        mark_parathesis(this);
     }
     print() {
         if (this.need_parathesis_in_printing == undefined) {
-            this.calculate_need_parathesis_in_printing();
+            this.calculate_need_parathesis_for_printing();
         }
         let operation = this.operation;
         let temp = this.children.map(child => {
             if (Equation.isBasedNode(child)) {
                 return child;
             } else {
-                if (this.need_parathesis_in_printing == true) {
-                    return "(" + child.print() + ")";
-                } else {
-                    return child.print();
-                }
+
+                return child.print();
+
             }
         });
 
@@ -176,7 +211,11 @@ class Equation {
             temp = temp.reduce((first, next) => {
                 return first + operation + next;
             });
-            return temp;
+            if (this.need_parathesis_in_printing == true) {
+                return "(" + temp + ")";
+            } else {
+                return temp;
+            }
         }
     }
     static isBasedNode(s) {
@@ -279,7 +318,7 @@ class Equation {
         // (1) if not contains numerial expressions
         // (2) match for a+a, a*a, a-a or a/a
         // (3) if 1*a, 0*a, a+0, a-0, a^1, a^0, 
-        // TODO (4) if * and /, or + and -, or sqrt and ^2 can undo each others
+        // (4) if * and /, or + and -, or sqrt and ^2 can undo each others
         function match_any_any(array, func) {
             // Check if any elements are equal to each others
             // check all permutations of the array
@@ -397,7 +436,12 @@ class Equation {
                 return e.children.every(e => is_simplified_4(e));
             }
         }
-        return is_simplified_1(e) && is_simplified_2(e) && is_simplified_3(e) && is_simplified_4(e);
+        return [is_simplified_1(e) && is_simplified_2(e) && is_simplified_3(e) && is_simplified_4(e),
+            is_simplified_1(e),
+            is_simplified_2(e),
+            is_simplified_3(e),
+            is_simplified_4(e)
+        ];
     }
     copy() {
         var temp = new Equation(this.print());
@@ -437,6 +481,8 @@ class Solver {
         Solver.quadratic_form = new Equation("2 * x ^ 2 + 2 * x + 2 = 2");
         Solver.cubic_form = new Equation("2 * x ^ 3 + 2 * x ^ 2 + 2 * x + 2 = 2");
         Solver.qadratic_form = new Equation("2 * x ^ 4 + 2 * x ^ 3 + 2 * x ^ 2 + 2 * x + 2 = 2");
+
+        this.simplify_equation();
     }
     matched_solvable_cases() {
         if (Equation.of_the_same_form(this.equation, Solver.linear_form)) {
@@ -450,6 +496,167 @@ class Solver {
         } else {
             // TODO "(x+1)(x+2) = 0", 
             return false;
+        }
+    }
+    simplify_equation() {
+        function match_any_any(array, func) {
+            // Check if any elements are equal to each others
+            // check all permutations of the array
+
+            if (array.length == 0) {
+                return true;
+            } else {
+                let temp = array.some((element, index) => {
+                    let temp2 = array.some((element2, index2) => {
+                        if (index == index2) {
+                            return false;
+                        } else {
+                            return func(element, element2);
+                        }
+                    });
+                    return temp2;
+                });
+                return temp;
+            }
+        }
+
+        function isNumber(n) {
+            return !isNaN(n);
+        }
+
+        function has_unsolve_variable(e) {
+            if (Equation.isBasedNode(e) && e == 'x') {
+                return true;
+            } else if (!Equation.isBasedNode(e)) {
+                let temp = e.children.some(child => has_unsolve_variable(child));
+                return temp;
+            } else {
+                return false;
+            }
+        }
+
+        function simplify_1(e) {
+            function eval_no_variable_expression(e) {
+                // TODO
+                if (Equation.get_depth(e) === 0) {
+                    return e;
+                } else if (Equation.get_depth(e) === 1) {
+                    if (e.operation == "+") {
+                        return e.children.reduce((first, next) => {
+                            return String(parseFloat(first) + parseFloat(next));
+                        });
+                    } else if (e.operation == "-") {
+                        return e.children.reduce((first, next) => {
+                            return String(parseFloat(first) - parseFloat(next));
+                        });
+                    } else if (e.operation == "*") {
+                        return e.children.reduce((first, next) => {
+                            return String(parseFloat(first) * parseFloat(next));
+                        });
+                    } else if (e.operation == "/") {
+                        return e.children.reduce((first, next) => {
+                            return String(parseFloat(first) / parseFloat(next));
+                        });
+                    } else if (e.operation == "sqrt") {
+                        return String(parseFloat(e.children[0]) ** 0.5);
+                    } else if (e.operation == "^") {
+                        return String(parseFloat(e.children[0]) ** parseFloat(e.children[1]));
+                    }
+                } else {
+                    let temp = e.children.map(child => eval_no_variable_expression(child));
+                    e = e.copy();
+                    e.children = temp;
+                    return eval_no_variable_expression(e);
+                }
+            }
+
+            if (Equation.get_depth(e) == 0) {
+                return e;
+            } else if (!has_unsolve_variable(e)) {
+                return eval_no_variable_expression(e);
+            } else {
+                e.children = e.children.map(child => simplify_1(child));
+                return e;
+            }
+        }
+
+        function simplify_2(e) {
+            if (Equation.get_depth(e) == 0) {
+                return true;
+            } else if (has_unsolve_variable(e)) {
+                // match_any_any(e.children, Equation.is_equal);
+                // check if any elements are equal to each others
+
+                for (let i = 0; i < e.children.length; i++) {
+                    for (let j = i + 1; j < e.children.length; j++) {
+                        if (Equation.is_equal(e.children[i], e.children[j])) {
+                            if (e.operation == "+") {
+                                let temp = e.children[i];
+                                temp = Equation.construct_new_node("*", [temp, "2"]);
+                                // Remove index i and j from e.children
+                                e.children.splice(i, 1);
+                                e.children.splice(j - 1, 1);
+                                e.children.unshift(temp);
+                            } else if (e.operation == "*") {
+                                let temp = e.children[i];
+                                temp = Equation.construct_new_node("^", [temp, "2"]);
+                                // Remove index i and j from e.children
+                                e.children.splice(i, 1);
+                                e.children.splice(j - 1, 1);
+                                e.children.unshift(temp);
+                            } else if (e.operation == "-") {
+                                // Remove index i and j from e.children
+                                e.children.splice(i, 1);
+                                e.children.splice(j - 1, 1);
+                                if (e.children.length == 0) {
+                                    e = "0";
+                                } else if (i === 0) {
+                                    e.children.unshift("0");
+                                }
+                            } else if (e.operation == "/") {
+                                // Remove index i and j from e.children
+                                e.children.splice(i, 1);
+                                e.children.splice(j - 1, 1);
+                                if (e.children.length == 0) {
+                                    e = "1";
+                                } else if (i === 0) {
+                                    e.children.unshift("1");
+                                }
+                            }
+                            return e;
+                        }
+                    }
+                }
+                let temp = e.children.every(child => simplify_2(child));
+                return temp;
+            } else {
+                throw new Error("Equation is not simplified_1");
+            }
+        }
+
+        function simplify_3(e) {
+            return e;
+        }
+
+        function simplify_4(e) {
+            return e;
+        }
+        let is_simplified = Equation.is_simplified(this.equation);
+        if (is_simplified[0]) {
+            return;
+        } else if (is_simplified[1] == false) {
+            this.equation = simplify_1(this.equation);
+            // return this.simplify_equation();
+        } else if (is_simplified[2] == false) {
+            this.equation = simplify_2(this.equation);
+            // return this.simplify_equation();
+        } else if (is_simplified[3] == false) {
+            this.equation = simplify_3(this.equation);
+            // return this.simplify_equation();
+        } else if (is_simplified[4] == false) {
+            // TODO
+            this.equation = simplify_4(this.equation);
+            // return this.simplify_equation();
         }
     }
     createChildren() {
@@ -489,7 +696,12 @@ class Solver {
             // Move all terms to the left side of the equation
 
             if (equation.operation == "=") {
-                if (Equation.isBasedNode(equation.children[1])) {
+                if (Equation.isBasedNode(equation.children[1]) ||
+                    equation.children[1].operation == "sqrt" ||
+                    equation.children[1].operation == "*" ||
+                    equation.children[1].operation == "^" ||
+                    equation.children[1].operation == "/") {
+
                     equation = equation.copy();
                     equation.children[0] = Equation.construct_new_node("-", [equation.children[0], equation.children[1]]);
                     equation.children[1] = "0";
@@ -499,10 +711,7 @@ class Solver {
                     const left = equation.children[0];
                     const right = equation.children[1];
 
-                    const leftSize = left.children.length;
                     const rightSize = right.children.length;
-
-                    const leftOperation = left.operation;
                     const rightOperation = right.operation;
 
                     if (rightOperation == "+") {
@@ -525,6 +734,37 @@ class Solver {
                             }
                             mutatedEquations.push(temp_equation);
                         }
+                    } else if (rightOperation == "-") {
+                        let subarrays = getSubArrays(Array.from(Array(rightSize).keys()));
+                        subarrays.forEach(subarray => subarray.sort());
+
+                        for (let chooses of subarrays) {
+                            let temp_equation = equation.copy();
+                            let choosesArray = [];
+
+                            chooses.forEach(index => {
+                                if (index != 0) {
+                                    choosesArray.push(right.children[index]);
+                                }
+                            });
+                            temp_equation.children[0] = Equation.construct_new_node("+", [temp_equation.children[0], ...choosesArray]);
+                            console.log(chooses, typeof (chooses));
+
+                            if (chooses.includes(0)) {
+                                temp_equation.children[0] = Equation.construct_new_node("-", [temp_equation.children[0], temp_equation.children[1].children[0]]);
+                            }
+                            temp_equation.children[1].children = temp_equation.children[1].children.filter((_, index) => !chooses.includes(index));
+                            temp_equation.children[1].children.unshift("0");
+
+                            if (temp_equation.children[1].children.length == 0) {
+                                temp_equation.children[1] = "0";
+                            } else if (temp_equation.children[1].children.length == 1) {
+                                if (chooses.includes(0)) {
+                                    temp_equation.children[1] = temp_equation.children[1].children[0];
+                                }
+                            }
+                            mutatedEquations.push(temp_equation);
+                        }
                     }
                     return mutatedEquations;
                 }
@@ -537,7 +777,12 @@ class Solver {
             // Move all terms to the right side of the equation
 
             if (equation.operation == "=") {
-                if (Equation.isBasedNode(equation.children[0])) {
+                if (Equation.isBasedNode(equation.children[0]) ||
+                    equation.children[0].operation == "sqrt" ||
+                    equation.children[0].operation == "*" ||
+                    equation.children[0].operation == "^" ||
+                    equation.children[0].operation == "/") {
+
                     equation = equation.copy();
                     equation.children[1] = Equation.construct_new_node("-", [equation.children[1], equation.children[0]]);
                     equation.children[0] = "0";
@@ -548,10 +793,7 @@ class Solver {
                     const right = equation.children[1];
 
                     const leftSize = left.children.length;
-                    const rightSize = right.children.length;
-
                     const leftOperation = left.operation;
-                    const rightOperation = right.operation;
 
                     if (leftOperation == "+") {
                         let subarrays = getSubArrays(Array.from(Array(leftSize).keys()));
@@ -573,6 +815,37 @@ class Solver {
                             }
                             mutatedEquations.push(temp_equation);
                         }
+                    } else if (leftOperation == "-") {
+                        let subarrays = getSubArrays(Array.from(Array(leftSize).keys()));
+                        subarrays.forEach(subarray => subarray.sort());
+
+                        for (let chooses of subarrays) {
+                            let temp_equation = equation.copy();
+                            let choosesArray = [];
+
+                            chooses.forEach(index => {
+                                if (index != 0) {
+                                    choosesArray.push(left.children[index]);
+                                }
+                            });
+                            temp_equation.children[1] = Equation.construct_new_node("+", [temp_equation.children[1], ...choosesArray]);
+                            console.log(chooses, typeof (chooses));
+
+                            if (chooses.includes(0)) {
+                                temp_equation.children[1] = Equation.construct_new_node("-", [temp_equation.children[1], temp_equation.children[0].children[0]]);
+                            }
+                            temp_equation.children[0].children = temp_equation.children[0].children.filter((_, index) => !chooses.includes(index));
+                            temp_equation.children[0].children.unshift("0");
+
+                            if (temp_equation.children[0].children.length == 0) {
+                                temp_equation.children[0] = "0";
+                            } else if (temp_equation.children[0].children.length == 1) {
+                                if (chooses.includes(0)) {
+                                    temp_equation.children[0] = temp_equation.children[0].children[0];
+                                }
+                            }
+                            mutatedEquations.push(temp_equation);
+                        }
                     }
                     return mutatedEquations;
                 }
@@ -580,11 +853,22 @@ class Solver {
                 return [];
             }
         }
+
+        function break_parathesis(equation) {
+            // TODO
+            return [];
+        }
+
+        function combine_terms(equation) {
+            // TODO
+            return [];
+        }
         this.children.push(...squareBothSides(this.equation));
         this.children.push(...sqrtBothSides(this.equation));
         this.children.push(...moveTermsToLeft(this.equation));
         this.children.push(...moveTermsToRight(this.equation));
 
+        this.children = this.children.map(child => new Solver(child));
 
         return this.children;
     }
@@ -699,22 +983,23 @@ class Solver {
 }
 
 function main() {
-    var s1 = new Equation("sqrt(x^2 + 1) + x = 4 + 4");
+    var s1 = new Equation("sqrt(x^2 + 1) = (4 + x)*4");
     var solver = new Solver(s1);
+    console.log(solver.equation.print());
     solver.createChildren();
 
-    let temp = solver.children.map(child => child.print());
+    let temp = solver.children.map(child => child.equation.print());
     console.log(temp);
 
-    temp = solver.children.map(child => Equation.is_simplified(child));
+    temp = solver.children.map(child => Equation.is_simplified(child.equation));
+    temp = temp.map(child => child[0]);
     console.log(temp);
 
-    temp = solver.children.map(child => Equation.get_depth(child));
+    temp = solver.children.map(child => Equation.get_depth(child.equation));
     console.log(temp);
 
     temp = solver.children.map(child => {
-        let temp = new Solver(child);
-        return temp.matched_solvable_cases();
+        return child.matched_solvable_cases();
     });
     console.log(temp);
 }
