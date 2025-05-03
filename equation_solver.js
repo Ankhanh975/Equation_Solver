@@ -1,3 +1,4 @@
+// TODO add operation uni_negative
 class Equation {
     constructor(expression_str) {
         // Recursively store the equation in a tree structure
@@ -134,7 +135,6 @@ class Equation {
             return [operation, parts];
         }
 
-
         this.children = [];
         this.parent = undefined;
         this.operation = null; // +, -, *, /, ^, sqrt
@@ -153,7 +153,6 @@ class Equation {
         if (this.need_parathesis_in_printing != undefined) {
             return;
         }
-        // TODO
         // Calculate the need_parathesis_in_printing for each node
         // Construct parent pointers
         function construct_parent_pointers(e) {
@@ -464,8 +463,7 @@ class Solver {
         "sqrt(x)^2 * x = 6",
         "sqrt(x)^2 + x = 6",
         "x^4 + x^3 + x^2 + x + 1 = 10",
-        "(x+1)(x+2) = 0", // TODO
-        "(x+2)^2 = (x+1)^2", // TODO
+        "(x+1)*(x+2) = 0", // TODO
     ];
     static linear_form;
     static quadratic_form;
@@ -537,7 +535,6 @@ class Solver {
 
         function simplify_1(e) {
             function eval_no_variable_expression(e) {
-                // TODO
                 if (Equation.get_depth(e) === 0) {
                     return e;
                 } else if (Equation.get_depth(e) === 1) {
@@ -635,10 +632,41 @@ class Solver {
         }
 
         function simplify_3(e) {
+            // TODO
+
             return e;
         }
 
         function simplify_4(e) {
+            // TODO
+
+            if (Equation.get_depth(e) == 0) {
+                return true;
+            } else {
+                if (e.operation == "*" || e.operation == "/" || e.operation == "+" || e.operation == "-") {
+                    if (match_any_any(e.children, Equation.is_equal)) {
+                        return false;
+                    }
+                } else if (e.operation == "sqrt" || e.operation == "^") {
+                    // sqrt and ^2 combined can undo each others
+                    if (e.operation == "sqrt") {
+                        // sqrt(a^2)
+                        if (e.children[0].operation == "^" && Equation.is_equal(e.children[0].children[1], "2")) {
+                            return false;
+                        }
+                    } else if (e.operation == "^") {
+                        // sqrt(a)^2
+                        if (e.children[0].operation == "sqrt" && Equation.is_equal(e.children[1], "2")) {
+                            return false;
+                        }
+                    }
+                }
+                return e.children.every(e => is_simplified_4(e));
+            }
+            return e;
+        }
+        function simplify_5(e){
+            // TODO
             return e;
         }
         let is_simplified = Equation.is_simplified(this.equation);
@@ -854,12 +882,32 @@ class Solver {
             }
         }
 
-        function break_parathesis(equation) {
+        function multiplyBothSides(e) {
             // TODO
             return [];
         }
 
-        function combine_terms(equation) {
+        function divideBothSides(e) {
+            // TODO
+            return [];
+        }
+
+        function break_parathesis(e) {
+            // TODO
+            // 2 cases where breaking is nessesary
+            // 1. a*(b+c) = a*b + a*c
+            // 2. a/(b+c) = a/b + a/c
+
+            return [];
+        }
+
+        function combine_terms(e) {
+            // TODO
+            return [];
+        }
+        function exchange_depth_of_terms(e) {
+            // change a+(b-c) to (a+b)-c or b+(a-c)
+            // change a-(b+(c-d)) to (a+d)-(b+c)  
             // TODO
             return [];
         }
@@ -867,6 +915,11 @@ class Solver {
         this.children.push(...sqrtBothSides(this.equation));
         this.children.push(...moveTermsToLeft(this.equation));
         this.children.push(...moveTermsToRight(this.equation));
+
+        this.children.push(...multiplyBothSides(this.equation));
+        this.children.push(...divideBothSides(this.equation));
+        this.children.push(...break_parathesis(this.equation));
+        this.children.push(...combine_terms(this.equation));
 
         this.children = this.children.map(child => new Solver(child));
 
@@ -983,7 +1036,8 @@ class Solver {
 }
 
 function main() {
-    var s1 = new Equation("sqrt(x^2 + 1) = (4 + x)*4");
+    // var s1 = new Equation("sqrt(x^2 + 1) = 4*4");
+    var s1 = new Equation("x^2 + 1 = 4*4");
     var solver = new Solver(s1);
     console.log(solver.equation.print());
     solver.createChildren();
@@ -1002,5 +1056,6 @@ function main() {
         return child.matched_solvable_cases();
     });
     console.log(temp);
+
 }
 main();
